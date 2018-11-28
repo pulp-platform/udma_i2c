@@ -104,8 +104,25 @@ module udma_i2c_top #(
 
     logic       s_do_rst;
 
+    logic [3:0] s_events;
+
     assign data_tx_datasize_o = 2'b00;
     assign data_rx_datasize_o = 2'b00;
+
+    generate
+        for (i = 0; i < 4; i++)
+        begin
+            edge_propagator i_event_sync
+            (
+                .clk_tx_i ( sys_clk_i       ),
+                .rstn_tx_i( rstn_i          ),
+                .edge_i   ( ext_events_i[i] ),
+                .clk_rx_i ( periph_clk_i    ),
+                .rstn_rx_i( rstn_i          ),
+                .edge_o   ( s_events[i]     )
+            );
+        end
+    endgenerate
 
     udma_i2c_reg_if #(
         .L2_AWIDTH_NOAL(L2_AWIDTH_NOAL),
@@ -198,7 +215,7 @@ module udma_i2c_top #(
 		.clk_i           ( periph_clk_i ),
 		.rstn_i          ( rstn_i ),
 
-		.ext_events_i    ( ext_events_i ),
+		.ext_events_i    ( s_events ),
 
 		.data_tx_i       ( s_data_tx_dc ),
 		.data_tx_valid_i ( s_data_tx_dc_valid),
