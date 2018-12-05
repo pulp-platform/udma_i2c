@@ -105,10 +105,12 @@ module udma_i2c_top #(
     logic       s_do_rst;
 
     logic [3:0] s_events;
-
+   
+    genvar 	i;
+   
     assign data_tx_datasize_o = 2'b00;
     assign data_rx_datasize_o = 2'b00;
-
+    
     generate
         for (i = 0; i < 4; i++)
         begin
