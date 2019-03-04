@@ -22,20 +22,7 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-// SPI Master Registers
-`define REG_RX_SADDR     5'b00000 //BASEADDR+0x00
-`define REG_RX_SIZE      5'b00001 //BASEADDR+0x04
-`define REG_RX_CFG       5'b00010 //BASEADDR+0x08
-`define REG_RX_INTCFG    5'b00011 //BASEADDR+0x0C
-
-`define REG_TX_SADDR     5'b00100 //BASEADDR+0x10
-`define REG_TX_SIZE      5'b00101 //BASEADDR+0x14
-`define REG_TX_CFG       5'b00110 //BASEADDR+0x18
-`define REG_TX_INTCFG    5'b00111 //BASEADDR+0x1C
-
-`define REG_STATUS       5'b01000 //BASEADDR+0x20
-`define REG_SETUP        5'b01001 //BASEADDR+0x24
-
+`include "udma_i2c_defines.sv"
 module udma_i2c_reg_if #(
     parameter L2_AWIDTH_NOAL = 12,
     parameter TRANS_SIZE     = 16
