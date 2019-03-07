@@ -21,6 +21,7 @@ module udma_i2c_top #(
 	input  logic                      sys_clk_i,      // master clock
 	input  logic                      periph_clk_i,   // master clock
 	input  logic                      rstn_i,         // asynchronous active low reset
+    output logic                      i2c_eot_o,
 
 	input  logic                [3:0] ext_events_i,
 
@@ -113,6 +114,8 @@ module udma_i2c_top #(
     logic [31:0] s_i2c_cmd;
     logic        s_i2c_cmd_valid;
     logic        s_i2c_cmd_ready;
+
+    logic        s_i2c_eot;
 
     logic [3:0] s_events;
    
@@ -278,6 +281,7 @@ module udma_i2c_top #(
 	(
 		.clk_i           ( periph_clk_i ),
 		.rstn_i          ( rstn_i ),
+		.eot_o           ( s_i2c_eot ),
 
 		.ext_events_i    ( s_events ),
 
@@ -304,5 +308,15 @@ module udma_i2c_top #(
         .udma_cmd_valid_i(s_udma_cmd_valid),
         .udma_cmd_ready_o(s_udma_cmd_ready)
 	);
+
+    edge_propagator u_eot_ep
+    (
+        .clk_tx_i ( periph_clk_i ),
+        .rstn_tx_i( rstn_i    ),
+        .edge_i   ( s_i2c_eot ),
+        .clk_rx_i ( sys_clk_i ),
+        .rstn_rx_i( rstn_i    ),
+        .edge_o   ( i2c_eot_o )
+    );
 
 endmodule
