@@ -17,6 +17,7 @@ module udma_i2c_control
 	//
 	input  logic                      clk_i,          // master clock
 	input  logic                      rstn_i,         // asynchronous active low reset
+    output logic                      eot_o,
 
 	input  logic                [3:0] ext_events_i,
 
@@ -75,6 +76,7 @@ module udma_i2c_control
     logic s_cmd_rpt;
     logic s_cmd_cfg;
     logic s_cmd_wrb;
+    logic s_cmd_eot;
 
     logic s_en_decode;
 
@@ -153,7 +155,8 @@ module udma_i2c_control
     assign s_cmd_rpt     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_RPT)     : 1'b0;
     assign s_cmd_cfg     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_CFG)     : 1'b0;
     assign s_cmd_wrb     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_WRB)     : 1'b0;
-
+    assign s_cmd_eot     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_EOT)     : 1'b0;
+    
     assign s_cmd_arg     = s_en_decode ? udma_cmd_i[24:0]                        : 'h0;
 
     assign s_ev_sel      = udma_cmd_i[25:24];
@@ -220,6 +223,7 @@ module udma_i2c_control
 		s_sample_div        = 1'b0;
 		s_sample_rpt        = 1'b0;
 		s_sample_ev         = 1'b0;
+        eot_o               = 1'b0;
 		case(CS)
 			ST_WAIT_IN_CMD:
 			begin
@@ -276,6 +280,11 @@ module udma_i2c_control
                         // write a byte on the bus, can be device address or
                         // a data byte (CMD/register address)
                         NS = ST_WRITE_BYTE;
+					end
+					else if(s_cmd_eot)
+					begin
+                        eot_o = 1'b1;
+                        // send eot
 					end
 					else if(s_cmd_rpt)
 					begin

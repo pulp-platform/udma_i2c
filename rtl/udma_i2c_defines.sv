@@ -28,6 +28,7 @@
 `define I2C_CMD_CFG       4'b1110  //  0xE --> CFG bus (clock divider)
 `define I2C_CMD_WAIT_EV   4'b0001  //  0x1
 `define I2C_CMD_WRB       4'b0111  //  0x7 --> write a byte on bus
+`define I2C_CMD_EOT       4'b1001  //  0x9 --> write a byte on bus
 
 // channel selection commands (TX/RX address and enable)
 `define I2C_CMD_SETUP_UCA 4'b0011  // 0x3 --> setup tx/rx address
