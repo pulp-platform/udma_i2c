@@ -18,16 +18,16 @@
 `define REG_SETUP        5'b01101 //BASEADDR+0x34
 
 // uDMA I2C commands
-`define I2C_CMD_START     4'b0000  //              0x0
-`define I2C_CMD_STOP      4'b0010  //              0x2
-`define I2C_CMD_RD_ACK    4'b0100  //              0x4
-`define I2C_CMD_RD_NACK   4'b0110  //              0x6
-`define I2C_CMD_WR        4'b1000  //              0x8
-`define I2C_CMD_WAIT      4'b1010  //              0xA
-`define I2C_CMD_RPT       4'b1100  //              0xC
-`define I2C_CMD_CFG       4'b1110  //              0xE
-`define I2C_CMD_WAIT_EV   4'b0001  //              0x1
-`define I2C_CMD_WRA       4'b0111  //              0x7
+`define I2C_CMD_START     4'b0000  //  0x0
+`define I2C_CMD_STOP      4'b0010  //  0x2
+`define I2C_CMD_RD_ACK    4'b0100  //  0x4 --> Send ACK after reading a byte
+`define I2C_CMD_RD_NACK   4'b0110  //  0x6 --> Send NACK to end read transfer
+`define I2C_CMD_WR        4'b1000  //  0x8 --> write a byte comming from TX
+`define I2C_CMD_WAIT      4'b1010  //  0xA --> wait for a set number of cycles
+`define I2C_CMD_RPT       4'b1100  //  0xC --> repeat next command N times
+`define I2C_CMD_CFG       4'b1110  //  0xE --> CFG bus (clock divider)
+`define I2C_CMD_WAIT_EV   4'b0001  //  0x1
+`define I2C_CMD_WRB       4'b0111  //  0x7 --> write a byte on bus
 
 // channel selection commands (TX/RX address and enable)
 `define I2C_CMD_SETUP_UCA 4'b0011  // 0x3 --> setup tx/rx address
