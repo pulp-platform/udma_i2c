@@ -123,7 +123,6 @@ module udma_i2c_top #(
     assign cmd_datasize_o     = 2'b10;
     
     generate
-        genvar i;
         for (i = 0; i < 4; i++)
         begin
             edge_propagator i_event_sync
