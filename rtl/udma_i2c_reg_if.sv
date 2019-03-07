@@ -22,20 +22,7 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-// SPI Master Registers
-`define REG_RX_SADDR     5'b00000 //BASEADDR+0x00
-`define REG_RX_SIZE      5'b00001 //BASEADDR+0x04
-`define REG_RX_CFG       5'b00010 //BASEADDR+0x08
-`define REG_RX_INTCFG    5'b00011 //BASEADDR+0x0C
-
-`define REG_TX_SADDR     5'b00100 //BASEADDR+0x10
-`define REG_TX_SIZE      5'b00101 //BASEADDR+0x14
-`define REG_TX_CFG       5'b00110 //BASEADDR+0x18
-`define REG_TX_INTCFG    5'b00111 //BASEADDR+0x1C
-
-`define REG_STATUS       5'b01000 //BASEADDR+0x20
-`define REG_SETUP        5'b01001 //BASEADDR+0x24
-
+`include "udma_i2c_defines.sv"
 module udma_i2c_reg_if #(
     parameter L2_AWIDTH_NOAL = 12,
     parameter TRANS_SIZE     = 16
@@ -71,12 +58,32 @@ module udma_i2c_reg_if #(
     input  logic [L2_AWIDTH_NOAL-1:0] cfg_tx_curr_addr_i,
     input  logic     [TRANS_SIZE-1:0] cfg_tx_bytes_left_i,
 
+    output logic [L2_AWIDTH_NOAL-1:0] cfg_cmd_startaddr_o,
+    output logic     [TRANS_SIZE-1:0] cfg_cmd_size_o,
+    output logic                      cfg_cmd_continuous_o,
+    output logic                      cfg_cmd_en_o,
+    output logic                      cfg_cmd_clr_o,
+    input  logic                      cfg_cmd_en_i,
+    input  logic                      cfg_cmd_pending_i,
+    input  logic [L2_AWIDTH_NOAL-1:0] cfg_cmd_curr_addr_i,
+    input  logic     [TRANS_SIZE-1:0] cfg_cmd_bytes_left_i,
+
     output logic                      cfg_do_rst_o,
 
     input  logic                      status_busy_i,
-    input  logic                      status_al_i
+    input  logic                      status_al_i,
+
+    input  logic               [31:0] udma_cmd_i,
+    input  logic                      udma_cmd_valid_i,
+    input  logic                      udma_cmd_ready_i
 );
 
+    logic [L2_AWIDTH_NOAL-1:0] r_cmd_startaddr;
+    logic   [TRANS_SIZE-1 : 0] r_cmd_size;
+    logic                      r_cmd_continuous;
+    logic                      r_cmd_en;
+    logic                      r_cmd_clr;
+    
     logic [L2_AWIDTH_NOAL-1:0] r_rx_startaddr;
     logic   [TRANS_SIZE-1 : 0] r_rx_size;
     logic                      r_rx_continuous;
@@ -97,8 +104,31 @@ module udma_i2c_reg_if #(
     logic                      r_al;
     logic                      r_busy;
 
+    //command decode signals
+    logic                 [3:0] s_cmd;
+    logic  [L2_AWIDTH_NOAL-1:0] s_cmd_decode_addr;
+    logic    [TRANS_SIZE-1 : 0] s_cmd_decode_size;
+    logic                       s_cmd_decode_txrxn;
+
+    logic                       s_is_cmd_uca;
+    logic                       s_is_cmd_ucs;
+
+    assign s_cmd              = udma_cmd_i[31:28];
+    assign s_cmd_decode_txrxn = udma_cmd_i[27];
+    assign s_cmd_decode_size  = udma_cmd_i[TRANS_SIZE-1:0];
+    assign s_cmd_decode_addr  = udma_cmd_i[L2_AWIDTH_NOAL-1:0];
+
+    assign s_is_cmd_uca = (s_cmd == `I2C_CMD_SETUP_UCA);
+    assign s_is_cmd_ucs = (s_cmd == `I2C_CMD_SETUP_UCS);
+
     assign s_wr_addr = (cfg_valid_i & ~cfg_rwn_i) ? cfg_addr_i : 5'h0;
     assign s_rd_addr = (cfg_valid_i &  cfg_rwn_i) ? cfg_addr_i : 5'h0;
+
+    assign cfg_cmd_startaddr_o  = r_cmd_startaddr;
+    assign cfg_cmd_size_o       = r_cmd_size;
+    assign cfg_cmd_continuous_o = r_cmd_continuous;
+    assign cfg_cmd_en_o         = r_cmd_en;
+    assign cfg_cmd_clr_o        = r_cmd_clr;
 
     assign cfg_rx_startaddr_o  = r_rx_startaddr;
     assign cfg_rx_size_o       = r_rx_size;
@@ -118,39 +148,78 @@ module udma_i2c_reg_if #(
     begin
         if(~rstn_i)
         begin
-            // SPI REGS
-            r_rx_startaddr  <=  'h0;
-            r_rx_size       <=  'h0;
-            r_rx_continuous <=  'h0;
-            r_rx_en          =  'h0;
-            r_rx_clr         =  'h0;
-            r_tx_startaddr  <=  'h0;
-            r_tx_size       <=  'h0;
-            r_tx_continuous <=  'h0;
-            r_tx_en          =  'h0;
-            r_tx_clr         =  'h0;
-            r_do_rst        <= 1'b0;
-            r_busy          <= 1'b0;
-            r_al            <= 1'b0;
+            // I2C REGS
+            r_cmd_startaddr  <=  'h0;
+            r_cmd_size       <=  'h0;
+            r_cmd_continuous <=  'h0;
+            r_cmd_en         <=  'h0;
+            r_cmd_clr        <=  'h0;
+            r_rx_startaddr   <=  'h0;
+            r_rx_size        <=  'h0;
+            r_rx_continuous  <=  'h0;
+            r_rx_en          <=  'h0;
+            r_rx_clr         <=  'h0;
+            r_tx_startaddr   <=  'h0;
+            r_tx_size        <=  'h0;
+            r_tx_continuous  <=  'h0;
+            r_tx_en          <=  'h0;
+            r_tx_clr         <=  'h0;
+            r_do_rst         <= 1'b0;
+            r_busy           <= 1'b0;
+            r_al             <= 1'b0;
         end
         else
         begin
-            r_rx_en         =  'h0;
-            r_rx_clr        =  'h0;
-            r_tx_en         =  'h0;
-            r_tx_clr        =  'h0;
-
-            if (cfg_valid_i & ~cfg_rwn_i)
+            r_rx_en         <=  'h0;
+            r_rx_clr        <=  'h0;
+            r_tx_en         <=  'h0;
+            r_tx_clr        <=  'h0;
+            r_cmd_en        <=  'h0;
+            r_cmd_clr       <=  'h0;
+            if (udma_cmd_valid_i && udma_cmd_ready_i && (s_is_cmd_ucs || s_is_cmd_uca))
+            begin
+                if(s_is_cmd_uca)
+                begin
+                    if(s_cmd_decode_txrxn)
+                        r_tx_startaddr <= s_cmd_decode_addr;
+                    else
+                        r_rx_startaddr <= s_cmd_decode_addr;
+                end
+                else
+                begin
+                    if(s_cmd_decode_txrxn)
+                    begin
+                        r_tx_size <= s_cmd_decode_size;
+                        r_tx_en   <= 1'b1;
+                    end
+                    else
+                    begin
+                        r_rx_size <= s_cmd_decode_size;
+                        r_rx_en   <= 1'b1;
+                    end
+                end
+            end
+            else if (cfg_valid_i & ~cfg_rwn_i)
             begin
                 case (s_wr_addr)
+                `REG_CMD_SADDR:
+                    r_cmd_startaddr   <= cfg_data_i[L2_AWIDTH_NOAL-1:0];
+                `REG_CMD_SIZE:
+                    r_cmd_size        <= cfg_data_i[TRANS_SIZE-1:0];
+                `REG_CMD_CFG:
+                begin
+                    r_cmd_clr         <= cfg_data_i[5];
+                    r_cmd_en          <= cfg_data_i[4];
+                    r_cmd_continuous  <= cfg_data_i[0];
+                end
                 `REG_RX_SADDR:
                     r_rx_startaddr   <= cfg_data_i[L2_AWIDTH_NOAL-1:0];
                 `REG_RX_SIZE:
                     r_rx_size        <= cfg_data_i[TRANS_SIZE-1:0];
                 `REG_RX_CFG:
                 begin
-                    r_rx_clr          = cfg_data_i[5];
-                    r_rx_en           = cfg_data_i[4];
+                    r_rx_clr         <= cfg_data_i[5];
+                    r_rx_en          <= cfg_data_i[4];
                     r_rx_continuous  <= cfg_data_i[0];
                 end
                 `REG_TX_SADDR:
@@ -159,8 +228,8 @@ module udma_i2c_reg_if #(
                     r_tx_size        <= cfg_data_i[TRANS_SIZE-1:0];
                 `REG_TX_CFG:
                 begin
-                    r_tx_clr          = cfg_data_i[5];
-                    r_tx_en           = cfg_data_i[4];
+                    r_tx_clr         <= cfg_data_i[5];
+                    r_tx_en          <= cfg_data_i[4];
                     r_tx_continuous  <= cfg_data_i[0];
                 end
                 `REG_SETUP:
@@ -189,6 +258,12 @@ module udma_i2c_reg_if #(
     begin
         cfg_data_o = 32'h0;
         case (s_rd_addr)
+        `REG_CMD_SADDR:
+            cfg_data_o = cfg_cmd_curr_addr_i;
+        `REG_CMD_SIZE:
+            cfg_data_o[TRANS_SIZE-1:0] = cfg_cmd_bytes_left_i;
+        `REG_CMD_CFG:
+            cfg_data_o = {26'h0,cfg_cmd_pending_i,cfg_cmd_en_i,1'b0,2'b10,r_cmd_continuous};
         `REG_RX_SADDR:
             cfg_data_o = cfg_rx_curr_addr_i;
         `REG_RX_SIZE:

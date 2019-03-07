@@ -8,23 +8,7 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-`define I2C_CMD_START   4'h0
-`define I2C_CMD_STOP    4'h2
-`define I2C_CMD_RD_ACK  4'h4
-`define I2C_CMD_RD_NACK 4'h6
-`define I2C_CMD_WR      4'h8
-`define I2C_CMD_WAIT    4'hA
-`define I2C_CMD_RPT     4'hC
-`define I2C_CMD_CFG     4'hE
-`define I2C_CMD_WAIT_EV 4'h1
-
-`define BUS_CMD_NONE  3'b000
-`define BUS_CMD_START 3'b001
-`define BUS_CMD_STOP  3'b010
-`define BUS_CMD_WRITE 3'b011
-`define BUS_CMD_READ  3'b100
-`define BUS_CMD_WAIT  3'b101
-
+`include "udma_i2c_defines.sv"
 
 module udma_i2c_control
 (
@@ -54,7 +38,12 @@ module udma_i2c_control
 	output logic                      scl_oe,
 	input  logic                      sda_i,
 	output logic                      sda_o,
-	output logic                      sda_oe
+	output logic                      sda_oe,
+
+    // CMD channel signals
+    input  logic [31:0] udma_cmd_i,
+    input  logic udma_cmd_valid_i,
+    output logic udma_cmd_ready_o
 );
 
 	//
@@ -66,14 +55,14 @@ module udma_i2c_control
                             ST_CMD_DONE,
                             ST_READ,
                             ST_WRITE,
+                            ST_WRITE_ADDRESS,
                             ST_STORE_DATA,
                             ST_SKIP_CMD,
                             ST_GET_DATA,
                             ST_GET_WAIT,
                             ST_GET_WAIT_EV,
                             ST_GET_RPT,
-                            ST_GET_CFG_MSB,
-                            ST_GET_CFG_LSB
+                            ST_GET_CFG
                         } CS,NS;
 
     logic s_cmd_start;
@@ -81,6 +70,7 @@ module udma_i2c_control
     logic s_cmd_rd_ack;
     logic s_cmd_rd_nack;
     logic s_cmd_wr;
+    logic s_cmd_wra;
     logic s_cmd_wait;
     logic s_cmd_wait_ev;
     logic s_cmd_rpt;
@@ -92,11 +82,17 @@ module udma_i2c_control
     logic s_sample_rpt;
     logic s_sample_ev;
 
+    // store command arguments for direct use (avoid relooping inside FSM
+    // states)
+    logic [24:0] s_cmd_arg;
+    logic [24:0] r_cmd_arg;
+
     logic [15:0] s_div_num;
     logic [15:0] r_div_num;
 
-    logic [6:0] s_rpt_num;
-    logic [6:0] r_rpt_num;
+    // rpt_num is limited by uDMA transfer size (16 bits wide)
+    logic [15:0] s_rpt_num;
+    logic [15:0] r_rpt_num;
 
     logic [7:0] s_data;
     logic [7:0] r_data;
@@ -147,17 +143,20 @@ module udma_i2c_control
 
 	assign s_do_rst    = sw_rst_i;
 
-    assign s_cmd_start   = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_START)   : 1'b0;
-    assign s_cmd_stop    = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_STOP)    : 1'b0;
-    assign s_cmd_rd_ack  = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_RD_ACK)  : 1'b0;
-    assign s_cmd_rd_nack = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_RD_NACK) : 1'b0;
-    assign s_cmd_wr      = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_WR)      : 1'b0;
-    assign s_cmd_wait    = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_WAIT)    : 1'b0;
-    assign s_cmd_wait_ev = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_WAIT_EV) : 1'b0;
-    assign s_cmd_rpt     = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_RPT)     : 1'b0;
-    assign s_cmd_cfg     = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_CFG)     : 1'b0;
+    assign s_cmd_start   = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_START)   : 1'b0;
+    assign s_cmd_stop    = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_STOP)    : 1'b0;
+    assign s_cmd_rd_ack  = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_RD_ACK)  : 1'b0;
+    assign s_cmd_rd_nack = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_RD_NACK) : 1'b0;
+    assign s_cmd_wr      = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_WR)      : 1'b0;
+    assign s_cmd_wra     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_WRA)     : 1'b0;
+    assign s_cmd_wait    = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_WAIT)    : 1'b0;
+    assign s_cmd_wait_ev = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_WAIT_EV) : 1'b0;
+    assign s_cmd_rpt     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_RPT)     : 1'b0;
+    assign s_cmd_cfg     = s_en_decode ? (udma_cmd_i[31:28] == `I2C_CMD_CFG)     : 1'b0;
 
-    assign s_ev_sel      = data_tx_i[1:0];
+    assign s_cmd_arg     = s_en_decode ? udma_cmd_i[24:0]                        : 'h0;
+
+    assign s_ev_sel      = udma_cmd_i[25:24];
 
     assign s_core_txd = (CS == ST_READ) ? r_rd_ack : s_data[7];
 
@@ -207,6 +206,7 @@ module udma_i2c_control
 		NS  = CS;
 		s_data_tx_ready     = 1'b0;
 		s_data_rx_valid     = 1'b0;
+		udma_cmd_ready_o    = 1'b0;
 		s_bus_if_cmd        = `BUS_CMD_NONE;
 		s_bus_if_cmd_valid  = 1'b0;
 		s_rd_ack            = r_rd_ack;
@@ -226,7 +226,8 @@ module udma_i2c_control
 				s_en_bus_ctrl   = 1'b0;
 				s_data_tx_ready	= 1'b1;
 				s_en_bus_ctrl   = 1'b1;
-				if (data_tx_valid_i)
+                udma_cmd_ready_o    = 1'b1;
+				if (udma_cmd_valid_i)
 				begin
 					s_en_decode     = 1'b1;
 					if(s_cmd_start)
@@ -252,7 +253,7 @@ module udma_i2c_control
 					end
 					else if(s_cmd_rd_ack)
 					begin
-	        			s_bus_if_cmd       = `BUS_CMD_READ;
+                        s_bus_if_cmd       = `BUS_CMD_READ;
 						s_bus_if_cmd_valid = 1'b1;
 						s_rd_ack = 1'b0;
 						s_bits = 8'h8;
@@ -260,7 +261,7 @@ module udma_i2c_control
 					end
 					else if(s_cmd_rd_nack)
 					begin
-	        			s_bus_if_cmd       = `BUS_CMD_READ;
+                        s_bus_if_cmd       = `BUS_CMD_READ;
 						s_bus_if_cmd_valid = 1'b1;
 						s_rd_ack = 1'b1;
 						s_bits = 8'h8;
@@ -270,13 +271,17 @@ module udma_i2c_control
 					begin
 						NS = ST_GET_DATA;
 					end
+					else if(s_cmd_wra)
+					begin
+                        NS = ST_WRITE_ADDRESS;
+					end
 					else if(s_cmd_rpt)
 					begin
 						NS = ST_GET_RPT;
 					end
 					else if(s_cmd_cfg)
 					begin
-						NS = ST_GET_CFG_MSB;
+						NS = ST_GET_CFG;
 					end
 				end
 			end
@@ -286,7 +291,7 @@ module udma_i2c_control
 					NS = ST_WAIT_IN_CMD;
 				else if (s_cmd_done && !(r_bits == 'h0))
 				begin
-        			s_bus_if_cmd       = `BUS_CMD_WAIT;
+                    s_bus_if_cmd       = `BUS_CMD_WAIT;
 					s_bus_if_cmd_valid = 1'b1;
 					s_bits             = r_bits - 1;
 					NS = ST_CMD_DONE;
@@ -305,7 +310,7 @@ module udma_i2c_control
 			ST_READ:
 				if (s_cmd_done && (r_bits == 'h1))
 				begin
-        			s_bus_if_cmd       = `BUS_CMD_WRITE;
+                    s_bus_if_cmd       = `BUS_CMD_WRITE;
 					s_bus_if_cmd_valid = 1'b1;
 					s_bits = r_bits - 1;
 					s_data = {r_data[6:0],s_core_rxd};
@@ -313,7 +318,7 @@ module udma_i2c_control
 				end
 				else if (s_cmd_done && !(r_bits == 'h0))
 				begin
-        			s_bus_if_cmd       = `BUS_CMD_READ;
+                    s_bus_if_cmd       = `BUS_CMD_READ;
 					s_bus_if_cmd_valid = 1'b1;
 					s_bits = r_bits - 1;
 					s_data = {r_data[6:0],s_core_rxd};
@@ -325,14 +330,14 @@ module udma_i2c_control
 				end
 			ST_STORE_DATA:
 			begin
-				s_data_rx_valid = 1'b1;
+                s_data_rx_valid = 1'b1;
 				if (data_rx_ready_i)
 				begin
 					if(r_rpt_num == 'h0)
 						NS = ST_WAIT_IN_CMD;
 					else
 					begin
-	        			s_bus_if_cmd       = `BUS_CMD_READ;
+                        s_bus_if_cmd       = `BUS_CMD_READ;
 						s_bus_if_cmd_valid = 1'b1;
 						s_bits = 'h8;
 						s_sample_rpt = 1'b1;
@@ -343,15 +348,15 @@ module udma_i2c_control
 			end
 			ST_GET_DATA:
 			begin
-					s_data_tx_ready	= 1'b1;
-					if (data_tx_valid_i)
-					begin
-	        			s_bus_if_cmd       = `BUS_CMD_WRITE;
-						s_bus_if_cmd_valid = 1'b1;
-						s_data = data_tx_i;
-						s_bits = 8'h8;
-						NS = ST_WRITE;
-					end
+                s_data_tx_ready	= 1'b1;
+                if (data_tx_valid_i)
+                begin
+                    s_bus_if_cmd       = `BUS_CMD_WRITE;
+                    s_bus_if_cmd_valid = 1'b1;
+                    s_data = data_tx_i;
+                    s_bits = 8'h8;
+                    NS = ST_WRITE;
+                end
 			end
 			ST_SKIP_CMD:
 			begin
@@ -360,59 +365,38 @@ module udma_i2c_control
 					NS = ST_WAIT_IN_CMD;
 				end
 			end
-			ST_GET_RPT:
-			begin
-					s_data_tx_ready	= 1'b1;
-					if (data_tx_valid_i)
-					begin
-						s_sample_rpt    = 1'b1;
-						if (data_tx_i == 'h0)
-						begin
-							s_rpt_num = 'h0;
-							NS = ST_SKIP_CMD;
-						end
-						else
-						begin
-	        				s_rpt_num       = data_tx_i - 1;
-							NS = ST_WAIT_IN_CMD;
-	        			end
-					end
-			end
-			ST_GET_CFG_MSB:
-			begin
-					s_data_tx_ready	= 1'b1;
-					if (data_tx_valid_i)
-					begin
-						s_sample_div = 1'b1;
-	        			s_div_num[15:8] = data_tx_i;
-						NS = ST_GET_CFG_LSB;
-					end
-			end
-			ST_GET_CFG_LSB:
-			begin
-					s_data_tx_ready	= 1'b1;
-					if (data_tx_valid_i)
-					begin
-						s_sample_div = 1'b1;
-	        			s_div_num[7:0] = data_tx_i;
-						NS = ST_WAIT_IN_CMD;
-					end
-			end
+            ST_GET_RPT:
+            begin
+                s_sample_rpt    = 1'b1;
+                if (r_cmd_arg[7:0] == 'h0)
+                begin
+                    s_rpt_num = 'h0;
+                    NS = ST_SKIP_CMD;
+                end
+                else
+                begin
+                    s_rpt_num = r_cmd_arg[15:0] - 1;
+                    NS = ST_WAIT_IN_CMD;
+                end
+            end
+			ST_GET_CFG:
+            begin
+                s_sample_div = 1'b1;
+                s_div_num[15:0] = r_cmd_arg[15:0];
+                NS = ST_WAIT_IN_CMD;
+            end
 			ST_GET_WAIT:
-			begin
-					s_data_tx_ready	= 1'b1;
-					if (data_tx_valid_i)
-					begin
-	        			s_bus_if_cmd       = `BUS_CMD_WAIT;
-						s_bus_if_cmd_valid = 1'b1;
-						s_bits = data_tx_i;
-						NS = ST_CMD_DONE;
-					end
-			end
+            begin
+                s_bus_if_cmd       = `BUS_CMD_WAIT;
+                s_bus_if_cmd_valid = 1'b1;
+                s_bits = r_cmd_arg[7:0];
+                NS = ST_CMD_DONE;
+            end
 			ST_WRITE:
+            begin
 				if (s_cmd_done && (r_bits == 'h1))
 				begin
-        			s_bus_if_cmd       = `BUS_CMD_READ;
+                    s_bus_if_cmd       = `BUS_CMD_READ;
 					s_bus_if_cmd_valid = 1'b1;
 					s_data = {r_data[6:0],1'b0};
 					s_bits = r_bits - 1;
@@ -420,7 +404,7 @@ module udma_i2c_control
 				end
 				else if (s_cmd_done && !(r_bits == 'h0))
 				begin
-        			s_bus_if_cmd       = `BUS_CMD_WRITE;
+                    s_bus_if_cmd       = `BUS_CMD_WRITE;
 					s_bus_if_cmd_valid = 1'b1;
 					s_data = {r_data[6:0],1'b0};
 					s_bits = r_bits - 1;
@@ -437,6 +421,15 @@ module udma_i2c_control
 				begin
 					NS = ST_WAIT_IN_CMD;
 				end
+            end
+            ST_WRITE_ADDRESS:
+            begin
+                s_bus_if_cmd       = `BUS_CMD_WRITE;
+                s_bus_if_cmd_valid = 1'b1;
+                s_data = r_cmd_arg[7:0];
+                s_bits = 8'h8;
+                NS = ST_WRITE;
+            end
 			default:
 			begin
 				NS  = ST_WAIT_IN_CMD;
@@ -454,9 +447,10 @@ module udma_i2c_control
 	end
 
 	always @(posedge clk_i or negedge rstn_i)
-	  if (!rstn_i)
+      if (!rstn_i)
 	  begin
 	    CS          <= ST_WAIT_IN_CMD;
+        r_cmd_arg   <= 'h0;
 	    r_sample_wd <= 1'b0;
 	    r_rpt_num   <= 'h0;
 	    r_data      <= 'h0;
@@ -472,6 +466,7 @@ module udma_i2c_control
 	  	if (s_do_rst)
 	  	begin
 		    CS          <= ST_WAIT_IN_CMD;
+            r_cmd_arg   <= 'h0;
 		    r_sample_wd <= 1'b0;
 		    r_rpt_num   <= 'h0;
 	    	r_data      <= 'h0;
@@ -485,6 +480,7 @@ module udma_i2c_control
 	  	else
 	  	begin
 		  	CS  <= NS;
+            r_cmd_arg   <= s_cmd_arg;
 		  	r_sample_wd <= s_sample_wd;
 	  		r_data      <= s_data;
 		  	r_bits      <= s_bits;

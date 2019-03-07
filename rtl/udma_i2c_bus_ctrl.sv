@@ -8,15 +8,7 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-`define I2C_CMD_NONE  3'b000
-`define I2C_CMD_START 3'b001
-`define I2C_CMD_STOP  3'b010
-`define I2C_CMD_WRITE 3'b011
-`define I2C_CMD_READ  3'b100
-`define I2C_CMD_WAIT  3'b101
-
-
-
+`include "udma_i2c_defines.sv"
 module udma_i2c_bus_ctrl
 (
     input  logic            clk_i,      // system clock
@@ -283,7 +275,7 @@ module udma_i2c_bus_ctrl
         if (sw_rst_i)
           r_cmd_stop <= 1'b0;
         else if (cmd_valid_i)
-          r_cmd_stop <= cmd_i == `I2C_CMD_STOP;
+          r_cmd_stop <= cmd_i == `BUS_CMD_STOP;
       end
 
     always @(posedge clk_i or negedge rstn_i)
@@ -338,11 +330,11 @@ module udma_i2c_bus_ctrl
                       if (cmd_valid_i)
                       begin
                         case (cmd_i) // synopsys full_case parallel_case
-                             `I2C_CMD_START: CS <= S_START_PHASE1;
-                             `I2C_CMD_STOP:  CS <= S_STOP_PHASE1;
-                             `I2C_CMD_WRITE: CS <= S_WR_PHASE1;
-                             `I2C_CMD_READ:  CS <= S_RD_PHASE1;
-                             `I2C_CMD_WAIT:  CS <= S_WAIT_PHASE1;
+                             `BUS_CMD_START: CS <= S_START_PHASE1;
+                             `BUS_CMD_STOP:  CS <= S_STOP_PHASE1;
+                             `BUS_CMD_WRITE: CS <= S_WR_PHASE1;
+                             `BUS_CMD_READ:  CS <= S_RD_PHASE1;
+                             `BUS_CMD_WAIT:  CS <= S_WAIT_PHASE1;
                              default:        CS <= S_IDLE;
                         endcase
                       end
