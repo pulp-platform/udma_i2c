@@ -210,7 +210,7 @@ module udma_i2c_top #(
 
         .sw_rst_i        ( s_do_rst ),
 
-		.err_o           ( ),
+		.err_o           ( err_o    ),
 
 		.scl_i           ( scl_i  ),
 		.scl_o           ( scl_o  ),
