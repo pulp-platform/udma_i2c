@@ -107,6 +107,8 @@ module udma_i2c_control
     logic r_sample_wd;
     logic s_sample_wd;
 
+	logic s_sample_arg;
+
     logic r_rd_ack;
     logic s_rd_ack;
 
@@ -223,6 +225,7 @@ module udma_i2c_control
 		s_sample_div        = 1'b0;
 		s_sample_rpt        = 1'b0;
 		s_sample_ev         = 1'b0;
+		s_sample_arg        = 1'b0;
         eot_o               = 1'b0;
 		case(CS)
 			ST_WAIT_IN_CMD:
@@ -234,6 +237,7 @@ module udma_i2c_control
 				if (udma_cmd_valid_i)
 				begin
 					s_en_decode     = 1'b1;
+					s_sample_arg    = 1'b1;
 					if(s_cmd_start)
 					begin
 						s_bus_if_cmd       = `BUS_CMD_START;
@@ -491,7 +495,8 @@ module udma_i2c_control
 	  	else
 	  	begin
 		  	CS  <= NS;
-            r_cmd_arg   <= s_cmd_arg;
+		  	if (s_sample_arg)
+            	r_cmd_arg   <= s_cmd_arg;
 		  	r_sample_wd <= s_sample_wd;
 	  		r_data      <= s_data;
 		  	r_bits      <= s_bits;
