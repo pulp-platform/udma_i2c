@@ -1,4 +1,7 @@
 udma_i2c:
+  incdirs: [
+    rtl
+  ]  
   files: [
     rtl/udma_i2c_reg_if.sv,
     rtl/udma_i2c_bus_ctrl.sv,
