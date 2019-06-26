@@ -31,6 +31,7 @@ module udma_i2c_control
 
 	input  logic                      sw_rst_i,
 
+	output logic                      ack_o,
 	output logic                      err_o,
 
 	// I2C signals
@@ -108,6 +109,7 @@ module udma_i2c_control
     logic s_sample_wd;
 
 	logic s_sample_arg;
+	logic s_read_ack;
 
     logic r_rd_ack;
     logic s_rd_ack;
@@ -144,6 +146,7 @@ module udma_i2c_control
 	assign s_al_rise   = ~r_al   & s_al;
 
 	assign err_o       = s_busy_rise | s_al_rise;
+	assign ack_o       = s_read_ack & s_core_rxd;
 
 	assign s_do_rst    = sw_rst_i;
 
@@ -226,10 +229,12 @@ module udma_i2c_control
 		s_sample_rpt        = 1'b0;
 		s_sample_ev         = 1'b0;
 		s_sample_arg        = 1'b0;
+		s_read_ack          = 1'b0;
         eot_o               = 1'b0;
 		case(CS)
 			ST_WAIT_IN_CMD:
 			begin
+		           s_read_ack          = 1'b1;
 				s_en_bus_ctrl   = 1'b0;
 				s_data_tx_ready	= 1'b1;
 				s_en_bus_ctrl   = 1'b1;
@@ -363,6 +368,8 @@ module udma_i2c_control
 			end
 			ST_GET_DATA:
 			begin
+		s_read_ack          = 1'b1;
+
                 s_data_tx_ready	= 1'b1;
                 if (data_tx_valid_i)
                 begin

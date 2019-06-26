@@ -72,6 +72,7 @@ module udma_i2c_reg_if #(
 
     input  logic                      status_busy_i,
     input  logic                      status_al_i,
+    input  logic                      status_ack_i,
 
     input  logic               [31:0] udma_cmd_i,
     input  logic                      udma_cmd_valid_i,
@@ -279,7 +280,7 @@ module udma_i2c_reg_if #(
         `REG_SETUP:
             cfg_data_o = {31'h0,r_do_rst};
         `REG_STATUS:
-            cfg_data_o = {30'h0,r_al,r_busy};
+            cfg_data_o = {29'h0, status_ack_i, r_al,r_busy};
         default:
             cfg_data_o = 'h0;
         endcase

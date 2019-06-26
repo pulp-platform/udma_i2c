@@ -295,7 +295,7 @@ module udma_i2c_bus_ctrl
     begin
       if(rstn_i == 1'b0)
       begin
-        dout_o <= 1'b1; //FIXME ANTONIO; PLEASE CHECK THAT RESET VALUE IS OK
+        dout_o <= 1'b1;
       end
       else
       begin
