@@ -24,3 +24,4 @@ sources:
       - rtl/udma_i2c_control.sv
       # Level 2
       - rtl/udma_i2c_top.sv
+      - rtl/udma_i2c_wrap.sv

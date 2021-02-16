@@ -240,7 +240,7 @@ module udma_i2c_control
 			ST_WAIT_IN_CMD:
 			begin
 				s_en_bus_ctrl   = 1'b0;
-				s_data_tx_ready	= 1'b1;
+				s_data_tx_ready	= 1'b0;
 				s_en_bus_ctrl   = 1'b1;
                 udma_cmd_ready_o    = 1'b1;
 				if (udma_cmd_valid_i)
