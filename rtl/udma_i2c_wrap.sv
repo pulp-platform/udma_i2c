@@ -143,7 +143,7 @@ assign rx_ch[0].data[31:8]= 'h0;
 // assigning unused signals
 assign rx_ch[0].stream = '0;
 assign rx_ch[0].stream_id = '0;
-//assign rx_ch[0].destination = '0;
+assign cmd_ch[0].destination = '0;
 assign tx_ch[0].destination = '0;
 
 endmodule : udma_i2c_wrap
