@@ -10,7 +10,7 @@
 
 `include "udma_i2c_defines.sv"
 
-module udma_i2c_top 
+module udma_i2c_top
     import udma_pkg::*;
 #(
     parameter L2_AWIDTH_NOAL = 21,

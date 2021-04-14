@@ -1,6 +1,6 @@
 package:
   name: udma_i2c
-  authors: 
+  authors:
     - "Antoine Faravelon <antoine.faravelon@greenwaves-technologies.com>"
     - "Antonio Pullini <pullinia@iis.ee.ethz.ch>"
     - "Florent Rotenberg <florent.rotenberg@greenwaves-technologies.com>"
@@ -9,7 +9,7 @@ package:
     - "Alfio Di Mauro <adimauro@iis.ee.ethz.ch>"
 
 dependencies:
-  udma_core: { git: "https://github.com/pulp-platform/udma_core.git", version: 1.0.1 }
+  udma_core: { git: "https://github.com/pulp-platform/udma_core.git", version: 2.0.0 }
 
 sources:
   - include_dirs:
