@@ -17,6 +17,7 @@
 `define I2C_CMD_RPT     4'hC
 `define I2C_CMD_CFG     4'hE
 `define I2C_CMD_WAIT_EV 4'h1
+`define I2C_CMD_EOT     4'h9
 
 `define BUS_CMD_NONE  3'b000
 `define BUS_CMD_START 3'b001
@@ -47,6 +48,8 @@ module udma_i2c_control
 	input  logic                      sw_rst_i,
 
 	output logic                      err_o,
+
+	output logic                      eot_o,
 
 	// I2C signals
 	input  logic                      scl_i,
@@ -85,6 +88,7 @@ module udma_i2c_control
     logic s_cmd_wait_ev;
     logic s_cmd_rpt;
     logic s_cmd_cfg;
+    logic s_cmd_eot;
 
     logic s_en_decode;
 
@@ -156,6 +160,7 @@ module udma_i2c_control
     assign s_cmd_wait_ev = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_WAIT_EV) : 1'b0;
     assign s_cmd_rpt     = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_RPT)     : 1'b0;
     assign s_cmd_cfg     = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_CFG)     : 1'b0;
+    assign s_cmd_eot     = s_en_decode ? (data_tx_i[7:4] == `I2C_CMD_EOT)     : 1'b0;
 
     assign s_ev_sel      = data_tx_i[1:0];
 
@@ -220,6 +225,7 @@ module udma_i2c_control
 		s_sample_div        = 1'b0;
 		s_sample_rpt        = 1'b0;
 		s_sample_ev         = 1'b0;
+		eot_o               = 1'b0;
 		case(CS)
 			ST_WAIT_IN_CMD:
 			begin
@@ -269,6 +275,10 @@ module udma_i2c_control
 					else if(s_cmd_wr)
 					begin
 						NS = ST_GET_DATA;
+					end
+					else if(s_cmd_eot)
+					begin
+						eot_o = 1'b1;
 					end
 					else if(s_cmd_rpt)
 					begin

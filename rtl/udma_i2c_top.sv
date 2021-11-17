@@ -17,6 +17,7 @@
 `define I2C_CMD_RPT     4'hC
 `define I2C_CMD_CFG     4'hE
 `define I2C_CMD_WAIT_EV 4'h1
+`define I2C_CMD_EOT     4'h9
 
 `define BUS_CMD_NONE  3'b000
 `define BUS_CMD_START 3'b001
@@ -81,6 +82,8 @@ module udma_i2c_top #(
 
 	output logic                      err_o,
 
+	output logic                      eot_o,          // end of transfer event
+
 	// I2C signals
 	input  logic                      scl_i,
 	output logic                      scl_o,
@@ -106,23 +109,30 @@ module udma_i2c_top #(
 
     logic [3:0] s_events;
 
+    logic       s_eot;
+
     assign data_tx_datasize_o = 2'b00;
     assign data_rx_datasize_o = 2'b00;
 
-    generate
-        for (i = 0; i < 4; i++)
-        begin
-            edge_propagator i_event_sync
-            (
-                .clk_tx_i ( sys_clk_i       ),
-                .rstn_tx_i( rstn_i          ),
-                .edge_i   ( ext_events_i[i] ),
-                .clk_rx_i ( periph_clk_i    ),
-                .rstn_rx_i( rstn_i          ),
-                .edge_o   ( s_events[i]     )
-            );
-        end
-    endgenerate
+    for (genvar i = 0; i < 4; i++) begin : gen_i_event_sync
+        edge_propagator i_event_sync (
+            .clk_tx_i ( sys_clk_i       ),
+            .rstn_tx_i( rstn_i          ),
+            .edge_i   ( ext_events_i[i] ),
+            .clk_rx_i ( periph_clk_i    ),
+            .rstn_rx_i( rstn_i          ),
+            .edge_o   ( s_events[i]     )
+        );
+    end
+
+    edge_propagator i_eot_sync (
+        .clk_tx_i ( periph_clk_i ),
+        .rstn_tx_i( rstn_i    ),
+        .edge_i   ( s_eot     ),
+        .clk_rx_i ( sys_clk_i ),
+        .rstn_rx_i( rstn_i    ),
+        .edge_o   ( eot_o     )
+    );
 
     udma_i2c_reg_if #(
         .L2_AWIDTH_NOAL(L2_AWIDTH_NOAL),
@@ -228,6 +238,8 @@ module udma_i2c_top #(
         .sw_rst_i        ( s_do_rst ),
 
 		.err_o           ( ),
+
+		.eot_o           ( s_eot  ),
 
 		.scl_i           ( scl_i  ),
 		.scl_o           ( scl_o  ),
