@@ -35,6 +35,7 @@
 
 `define REG_STATUS       5'b01000 //BASEADDR+0x20
 `define REG_SETUP        5'b01001 //BASEADDR+0x24
+`define REG_ACK          5'b01010 //BASEADDR+0x28
 
 module udma_i2c_reg_if #(
     parameter L2_AWIDTH_NOAL = 12,
@@ -74,7 +75,9 @@ module udma_i2c_reg_if #(
     output logic                      cfg_do_rst_o,
 
     input  logic                      status_busy_i,
-    input  logic                      status_al_i
+    input  logic                      status_al_i,
+
+    input  logic                      nack_i
 );
 
     logic [L2_AWIDTH_NOAL-1:0] r_rx_startaddr;
@@ -96,6 +99,7 @@ module udma_i2c_reg_if #(
 
     logic                      r_al;
     logic                      r_busy;
+    logic                      r_nack;
 
     assign s_wr_addr = (cfg_valid_i & ~cfg_rwn_i) ? cfg_addr_i : 5'h0;
     assign s_rd_addr = (cfg_valid_i &  cfg_rwn_i) ? cfg_addr_i : 5'h0;
@@ -132,6 +136,7 @@ module udma_i2c_reg_if #(
             r_do_rst        <= 1'b0;
             r_busy          <= 1'b0;
             r_al            <= 1'b0;
+            r_nack          <= 1'b0;
         end
         else
         begin
@@ -182,6 +187,14 @@ module udma_i2c_reg_if #(
                 if (status_al_i)
                     r_al   <= 1'b1;
             end
+
+            // clear on read
+            if(cfg_valid_i && cfg_rwn_i && (s_rd_addr == `REG_ACK))
+                r_nack <= 1'b0;
+
+            // sticky when nack, high priority
+            if (nack_i)
+                r_nack <= 1'b1;
         end
     end //always
 
@@ -205,6 +218,8 @@ module udma_i2c_reg_if #(
             cfg_data_o = {31'h0,r_do_rst};
         `REG_STATUS:
             cfg_data_o = {30'h0,r_al,r_busy};
+        `REG_ACK:
+            cfg_data_o = {31'h0,r_nack};
         default:
             cfg_data_o = 'h0;
         endcase
