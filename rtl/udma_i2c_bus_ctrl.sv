@@ -103,7 +103,7 @@ module udma_i2c_bus_ctrl
     always @(posedge clk_i, negedge rstn_i)
     begin
       if(rstn_i == 1'b0)
-        dscl_oen <= 1'b1;  //FIXME ANTONIO; PLEASE CHECK THAT RESET VALUE IS OK
+        dscl_oen <= 1'b1;
       else
         dscl_oen <= scl_oen;
     end
@@ -303,7 +303,7 @@ module udma_i2c_bus_ctrl
     begin
       if(rstn_i == 1'b0)
       begin
-        dout_o <= 1'b1; //FIXME ANTONIO; PLEASE CHECK THAT RESET VALUE IS OK
+        dout_o <= 1'b1;
       end
       else
       begin
@@ -331,13 +331,13 @@ module udma_i2c_bus_ctrl
       end
       else
       begin
-              case (CS) // synopsys full_case parallel_case
+              unique case (CS)
                     // S_IDLE state
                     S_IDLE:
                     begin
                       if (cmd_valid_i)
                       begin
-                        case (cmd_i) // synopsys full_case parallel_case
+                        unique case (cmd_i)
                              `I2C_CMD_START: CS <= S_START_PHASE1;
                              `I2C_CMD_STOP:  CS <= S_STOP_PHASE1;
                              `I2C_CMD_WRITE: CS <= S_WR_PHASE1;
