@@ -109,6 +109,8 @@ module udma_i2c_top #(
 
     logic [3:0] s_events;
 
+    logic       s_busy;
+    logic       s_al;
     logic       s_eot;
     logic       s_nack;
 
@@ -180,8 +182,8 @@ module udma_i2c_top #(
 
         .cfg_do_rst_o       ( s_do_rst ),
 
-        .status_busy_i      ( 1'b0  ),
-        .status_al_i        ( 1'b0  ),
+        .status_busy_i      ( s_busy ),
+        .status_al_i        ( s_al   ),
 
         .nack_i             ( s_nack )
     );
@@ -247,9 +249,11 @@ module udma_i2c_top #(
 		.data_rx_valid_o ( s_data_rx_dc_valid ),
 		.data_rx_ready_i ( s_data_rx_dc_ready ),
 
-        .sw_rst_i        ( s_do_rst ),
+		.sw_rst_i        ( s_do_rst ),
 
-		.err_o           ( ),
+		.busy_o          ( s_busy ),
+		.al_o            ( s_al   ),
+		.err_o           ( err_o  ),
 		.eot_o           ( s_eot  ),
 		.ack_no          ( s_nack ),
 		.scl_i           ( scl_i  ),

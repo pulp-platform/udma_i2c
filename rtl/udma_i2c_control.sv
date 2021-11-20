@@ -47,6 +47,9 @@ module udma_i2c_control
 
 	input  logic                      sw_rst_i,
 
+	output logic                      busy_o,
+	output logic                      al_o,
+
 	output logic                      err_o,
 	output logic                      ack_no,
 
@@ -148,6 +151,9 @@ module udma_i2c_control
 
 	assign s_busy_rise = ~r_busy & s_busy;
 	assign s_al_rise   = ~r_al   & s_al;
+
+	assign busy_o = s_busy_rise;
+	assign al_o = s_al_rise;
 
 	assign err_o       = s_busy_rise | s_al_rise;
 

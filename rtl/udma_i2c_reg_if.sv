@@ -175,18 +175,18 @@ module udma_i2c_reg_if #(
 
                 endcase
             end
-            if(cfg_valid_i && cfg_rwn_i && (s_rd_addr == `REG_STATUS))
-            begin
+
+            // clear on read
+            if(cfg_valid_i && cfg_rwn_i && (s_rd_addr == `REG_STATUS)) begin
                 r_busy <= 0;
                 r_al   <= 0;
             end
-            else
-            begin
-                if (status_busy_i)
-                    r_busy <= 1'b1;
-                if (status_al_i)
-                    r_al   <= 1'b1;
-            end
+
+            // sticky busy and al
+            if (status_busy_i)
+                r_busy <= 1'b1;
+            if (status_al_i)
+                r_al   <= 1'b1;
 
             // clear on read
             if(cfg_valid_i && cfg_rwn_i && (s_rd_addr == `REG_ACK))
