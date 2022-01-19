@@ -16,6 +16,7 @@
 
 `define REG_STATUS       5'b01100 //BASEADDR+0x30
 `define REG_SETUP        5'b01101 //BASEADDR+0x34
+`define REG_ACK          5'b01110 //BASEADDR+0X38
 
 // uDMA I2C commands
 `define I2C_CMD_START     4'b0000  //  0x0
