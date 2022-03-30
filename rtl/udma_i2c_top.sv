@@ -21,7 +21,6 @@ module udma_i2c_top #(
 	input  logic                      sys_clk_i,      // master clock
 	input  logic                      periph_clk_i,   // master clock
 	input  logic                      rstn_i,         // asynchronous active low reset
-    output logic                      i2c_eot_o,
 
 	input  logic                [3:0] ext_events_i,
 
@@ -32,7 +31,7 @@ module udma_i2c_top #(
 	output logic               [31:0] cfg_data_o,
 	output logic                      cfg_ready_o,
 
-    
+
     output logic [L2_AWIDTH_NOAL-1:0] cfg_cmd_startaddr_o,
     output logic     [TRANS_SIZE-1:0] cfg_cmd_size_o,
     output logic                      cfg_cmd_continuous_o,
@@ -62,7 +61,7 @@ module udma_i2c_top #(
     input  logic                      cfg_tx_pending_i,
     input  logic [L2_AWIDTH_NOAL-1:0] cfg_tx_curr_addr_i,
     input  logic     [TRANS_SIZE-1:0] cfg_tx_bytes_left_i,
-    
+
     output logic                      cmd_req_o,
     input  logic                      cmd_gnt_i,
     output logic                [1:0] cmd_datasize_o,
@@ -83,6 +82,8 @@ module udma_i2c_top #(
 	input  logic                      data_rx_ready_i,
 
 	output logic                      err_o,
+	output logic                      eot_o,      // i2c end of transfer event
+	output logic                      nack_o,     // i2c slave device does not aknowledge the event
 
 	// I2C signals
 	input  logic                      scl_i,
@@ -106,8 +107,7 @@ module udma_i2c_top #(
     logic       s_data_rx_dc_ready;
 
     logic       s_do_rst;
-    logic       s_ack;
-    
+
     logic [31:0] s_udma_cmd;
     logic        s_udma_cmd_valid;
     logic        s_udma_cmd_ready;
@@ -116,18 +116,19 @@ module udma_i2c_top #(
     logic        s_i2c_cmd_valid;
     logic        s_i2c_cmd_ready;
 
+    logic        s_i2c_busy;
+    logic        s_i2c_al;
     logic        s_i2c_eot;
+    logic        s_i2c_nack;
 
     logic [3:0] s_events;
-   
-    genvar 	i;
-   
+
     assign data_tx_datasize_o = 2'b00;
     assign data_rx_datasize_o = 2'b00;
     assign cmd_datasize_o     = 2'b10;
-    
+
     generate
-        for (i = 0; i < 4; i++)
+        for (genvar i = 0; i < 4; i++)
         begin
             edge_propagator i_event_sync
             (
@@ -140,6 +141,15 @@ module udma_i2c_top #(
             );
         end
     endgenerate
+
+    edge_propagator i_nack_sync (
+        .clk_tx_i ( periph_clk_i ),
+        .rstn_tx_i( rstn_i    ),
+        .edge_i   ( s_i2c_nack),
+        .clk_rx_i ( sys_clk_i ),
+        .rstn_rx_i( rstn_i    ),
+        .edge_o   ( nack_o)
+    );
 
     udma_i2c_reg_if #(
         .L2_AWIDTH_NOAL(L2_AWIDTH_NOAL),
@@ -187,16 +197,16 @@ module udma_i2c_top #(
 
         .cfg_do_rst_o       ( s_do_rst ),
 
-        .status_busy_i      ( 1'b0  ),
-        .status_al_i        ( 1'b0  ),
-        .status_ack_i       ( s_ack  ),
+        .status_busy_i      ( s_i2c_busy ),
+        .status_al_i        ( s_i2c_al   ),
+        .nack_i             ( s_i2c_nack ),
 
         .udma_cmd_i         ( s_i2c_cmd           ),
         .udma_cmd_valid_i   ( s_i2c_cmd_valid     ),
         .udma_cmd_ready_i   ( s_i2c_cmd_ready     )
     );
 
-    
+
     // command TX FIFO
     // 32 bits wide to allow embbeding size/addresses in UCA/UCS
     // 24 lower bits ignored for other commands
@@ -219,8 +229,8 @@ module udma_i2c_top #(
 
     udma_dc_fifo #(32,4) u_dc_cmd
     (
-        .dst_clk_i          ( periph_clk_i      ),   
-        .dst_rstn_i         ( rstn_i            ),  
+        .dst_clk_i          ( periph_clk_i      ),
+        .dst_rstn_i         ( rstn_i            ),
         .dst_data_o         ( s_udma_cmd        ),
         .dst_valid_o        ( s_udma_cmd_valid  ),
         .dst_ready_i        ( s_udma_cmd_ready  ),
@@ -283,8 +293,6 @@ module udma_i2c_top #(
 	(
 		.clk_i           ( periph_clk_i ),
 		.rstn_i          ( rstn_i ),
-		.eot_o           ( s_i2c_eot ),
-
 		.ext_events_i    ( s_events ),
 
 		.data_tx_i       ( s_data_tx_dc ),
@@ -295,11 +303,13 @@ module udma_i2c_top #(
 		.data_rx_valid_o ( s_data_rx_dc_valid ),
 		.data_rx_ready_i ( s_data_rx_dc_ready ),
 
-        .sw_rst_i        ( s_do_rst ),
+                .sw_rst_i        ( s_do_rst ),
 
-		.err_o           ( ),
-		.ack_o           ( s_ack ),
-
+                .busy_o          ( s_i2c_busy),
+                .al_o            ( s_i2c_al  ),
+	        .eot_o           ( s_i2c_eot ),
+		.ack_no          ( s_i2c_nack),
+	        .err_o           ( err_o  ),
 		.scl_i           ( scl_i  ),
 		.scl_o           ( scl_o  ),
 		.scl_oe          ( scl_oe ),
@@ -319,7 +329,7 @@ module udma_i2c_top #(
         .edge_i   ( s_i2c_eot ),
         .clk_rx_i ( sys_clk_i ),
         .rstn_rx_i( rstn_i    ),
-        .edge_o   ( i2c_eot_o )
+        .edge_o   ( eot_o )
     );
 
 endmodule
