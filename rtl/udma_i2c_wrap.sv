@@ -33,7 +33,7 @@
     output logic  [31:0] cfg_data_o,
 
     output udma_evt_t    events_o,
-    output logic         eot_o,
+    output logic         err_o,
     output logic         nack_o,
     input  udma_evt_t    events_i,
 
@@ -131,8 +131,8 @@ udma_i2c_top #(
     .sda_o               ( i2c_to_pad.sda_o     ),
     .sda_oe              ( i2c_to_pad.sda_oe    ),
 
-    .err_o               ( events_o[3]         ),
-    .eot_o,
+    .err_o,
+    .eot_o               ( events_o[3]         ),
     .nack_o,
     .ext_events_i        ( events_i            )
 );
