@@ -23,7 +23,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 `include "udma_i2c_defines.sv"
-module udma_i2c_reg_if #(
+module udma_i2c_reg_if 
+    import udma_pkg::*;
+#(
     parameter L2_AWIDTH_NOAL = 12,
     parameter TRANS_SIZE     = 16
 )
@@ -47,6 +49,7 @@ module udma_i2c_reg_if #(
     input  logic                      cfg_rx_pending_i,
     input  logic [L2_AWIDTH_NOAL-1:0] cfg_rx_curr_addr_i,
     input  logic     [TRANS_SIZE-1:0] cfg_rx_bytes_left_i,
+    output ch_dest_t                  cfg_rx_dest_o,
 
     output logic [L2_AWIDTH_NOAL-1:0] cfg_tx_startaddr_o,
     output logic     [TRANS_SIZE-1:0] cfg_tx_size_o,
@@ -115,6 +118,8 @@ module udma_i2c_reg_if #(
     logic                       s_is_cmd_uca;
     logic                       s_is_cmd_ucs;
 
+    ch_dest_t                  r_rx_dest;
+
     assign s_cmd              = udma_cmd_i[31:28];
     assign s_cmd_decode_txrxn = udma_cmd_i[27];
     assign s_cmd_decode_size  = udma_cmd_i[TRANS_SIZE-1:0];
@@ -146,6 +151,8 @@ module udma_i2c_reg_if #(
 
     assign cfg_do_rst_o        = r_do_rst;
 
+    assign cfg_rx_dest_o       = r_rx_dest;
+
     always_ff @(posedge clk_i, negedge rstn_i)
     begin
         if(~rstn_i)
@@ -162,6 +169,7 @@ module udma_i2c_reg_if #(
             r_rx_en          <=  'h0;
             r_rx_clr         <=  'h0;
             r_tx_startaddr   <=  'h0;
+            r_rx_dest        <=  'h0;
             r_tx_size        <=  'h0;
             r_tx_continuous  <=  'h0;
             r_tx_en          <=  'h0;
@@ -240,6 +248,11 @@ module udma_i2c_reg_if #(
                     r_do_rst         <= cfg_data_i[0];
                 end
 
+                `REG_DST:
+                begin
+                    r_rx_dest         <= cfg_data_i[DEST_SIZE-1:0];
+                end
+
                 endcase
             end
 
@@ -291,6 +304,8 @@ module udma_i2c_reg_if #(
             cfg_data_o = {26'h0,cfg_tx_pending_i,cfg_tx_en_i,3'h0,r_tx_continuous};
         `REG_SETUP:
             cfg_data_o = {31'h0,r_do_rst};
+        `REG_DST:
+            cfg_data_o = 32'h00000000 | r_rx_dest;
         `REG_STATUS:
             cfg_data_o = {30'h0, r_al,r_busy};
         `REG_ACK:
