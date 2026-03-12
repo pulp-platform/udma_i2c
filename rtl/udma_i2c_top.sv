@@ -8,6 +8,55 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
+`ifdef I2C_CMD_START
+`undef I2C_CMD_START
+`endif
+`ifdef I2C_CMD_STOP
+`undef I2C_CMD_STOP
+`endif
+`ifdef I2C_CMD_RD_ACK
+`undef I2C_CMD_RD_ACK
+`endif
+`ifdef I2C_CMD_RD_NACK
+`undef I2C_CMD_RD_NACK
+`endif
+`ifdef I2C_CMD_WR
+`undef I2C_CMD_WR
+`endif
+`ifdef I2C_CMD_WAIT
+`undef I2C_CMD_WAIT
+`endif
+`ifdef I2C_CMD_RPT
+`undef I2C_CMD_RPT
+`endif
+`ifdef I2C_CMD_CFG
+`undef I2C_CMD_CFG
+`endif
+`ifdef I2C_CMD_WAIT_EV
+`undef I2C_CMD_WAIT_EV
+`endif
+`ifdef I2C_CMD_EOT
+`undef I2C_CMD_EOT
+`endif
+`ifdef BUS_CMD_NONE
+`undef BUS_CMD_NONE
+`endif
+`ifdef BUS_CMD_START
+`undef BUS_CMD_START
+`endif
+`ifdef BUS_CMD_STOP
+`undef BUS_CMD_STOP
+`endif
+`ifdef BUS_CMD_WRITE
+`undef BUS_CMD_WRITE
+`endif
+`ifdef BUS_CMD_READ
+`undef BUS_CMD_READ
+`endif
+`ifdef BUS_CMD_WAIT
+`undef BUS_CMD_WAIT
+`endif
+
 `define I2C_CMD_START   4'h0
 `define I2C_CMD_STOP    4'h2
 `define I2C_CMD_RD_ACK  4'h4
